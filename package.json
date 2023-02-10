@@ -9,9 +9,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@u4/opencv4nodejs": "^6.4.1",
     "sharp": "^0.31.3"
   },
   "devDependencies": {
     "@types/sharp": "^0.31.1"
+  },
+  "opencv4nodejs": {
+    "autoBuildOpencvVersion": "4.6.0"
   }
 }

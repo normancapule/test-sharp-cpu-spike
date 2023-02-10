@@ -1,4 +1,6 @@
-import sharp from "sharp";
+import fs from "node:fs"
+import * as cv from '@u4/opencv4nodejs'
+import { Rect } from "@u4/opencv4nodejs";
 
 type Product = {
   x1: number;
@@ -124,13 +126,11 @@ const products: Product[] = [
   { x1: 1961, x2: 2105, y1: 2021, y2: 2147 },
 ];
 
-const cropBaseImage = async (imageBuffer: Buffer, product: Product) => {
-  return await sharp(imageBuffer, { sequentialRead: true  }).extract({
-    width: product.x2 - product.x1 + 1,
-    height: product.y2 - product.y1 + 1,
-    left: product.x1,
-    top: product.y1,
-  }).toBuffer();
+const cropBaseImage = async (matrix: cv.Mat, product: Product) => {
+  const rect = new Rect(product.x1, product.y1, product.x2 - product.x1 + 1, product.y2 - product.y1 + 1)
+  const region = matrix.getRegion(rect)
+
+  return cv.imencode('.jpeg', region)
 };
 
 const sequential = async (promises: Promise<any>[]) => {
@@ -139,17 +139,23 @@ const sequential = async (promises: Promise<any>[]) => {
     results.push(await promise);
   }
 
-  return results;
+  return results
 };
+
 const runTest = async () => {
+  console.log(`Start runTest`)
   const start = Date.now().valueOf();
-  const imageBuffer = await sharp("./sample.jpeg").rotate().toBuffer();
-  const promises = products.map(async (product) => {
-    return cropBaseImage(imageBuffer, product);
-  });
-  const result = await sequential(promises);
+  const im = await cv.imread("./sample.jpeg")
 
-  console.log(`Done - ${Date.now().valueOf() - start}ms`);
+  const promises = products.map(async (product, index) => {
+    const result = await cropBaseImage(im, product);
+    fs.writeFileSync(`test${index}.jpeg`, result)
+    console.log(`${result.length} - ${index}`)
+  });
+
+  await Promise.all(promises);
+
+  console.log(`Done runTest - ${Date.now().valueOf() - start}ms`);
 };
 
-runTest();
+runTest()
