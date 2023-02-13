@@ -1,4 +1,5 @@
-import sharp from "sharp";
+import sharp, { OutputInfo } from "sharp";
+import fs from "node:fs";
 
 type Product = {
   x1: number;
@@ -124,13 +125,20 @@ const products: Product[] = [
   { x1: 1961, x2: 2105, y1: 2021, y2: 2147 },
 ];
 
-const cropBaseImage = async (imageBuffer: Buffer, product: Product) => {
-  return await sharp(imageBuffer, { sequentialRead: true  }).extract({
-    width: product.x2 - product.x1 + 1,
-    height: product.y2 - product.y1 + 1,
-    left: product.x1,
-    top: product.y1,
-  }).toBuffer();
+const cropBaseImage = async (
+  imageBuffer: Buffer,
+  info: OutputInfo,
+  product: Product
+) => {
+  const { width, height, channels } = info;
+  return await sharp(imageBuffer, { raw: { width, height, channels } })
+    .extract({
+      width: product.x2 - product.x1 + 1,
+      height: product.y2 - product.y1 + 1,
+      left: product.x1,
+      top: product.y1,
+    })
+    .toBuffer();
 };
 
 const sequential = async (promises: Promise<any>[]) => {
@@ -141,15 +149,30 @@ const sequential = async (promises: Promise<any>[]) => {
 
   return results;
 };
-const runTest = async () => {
+const runTest = async (parentBuffer: Buffer) => {
   const start = Date.now().valueOf();
-  const imageBuffer = await sharp("./sample.jpeg").rotate().toBuffer();
+  const { data, info } = await sharp(parentBuffer, {})
+    .rotate()
+    .toBuffer({ resolveWithObject: true });
   const promises = products.map(async (product) => {
-    return cropBaseImage(imageBuffer, product);
+    return cropBaseImage(data, info, product);
   });
-  const result = await sequential(promises);
+  const result = await Promise.allSettled(promises);
 
   console.log(`Done - ${Date.now().valueOf() - start}ms`);
 };
 
-runTest();
+const runMe = async () => {
+  const parentBuffer = await sharp("./sample.jpeg").toBuffer();
+
+  const promises = [];
+  for (let i = 0; i < 100; i++) {
+    promises.push(runTest(parentBuffer));
+  }
+
+  return Promise.allSettled(promises);
+};
+
+(async () => {
+  await runMe();
+})();
