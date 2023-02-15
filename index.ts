@@ -149,24 +149,21 @@ const sequential = async (promises: Promise<any>[]) => {
 
   return results;
 };
-const runTest = async (parentBuffer: Buffer) => {
+const runTest = async (parentBuffer: { data: Buffer, info: OutputInfo}) => {
   const start = Date.now().valueOf();
-  const { data, info } = await sharp(parentBuffer, {})
-    .rotate()
-    .toBuffer({ resolveWithObject: true });
   const promises = products.map(async (product) => {
-    return cropBaseImage(data, info, product);
+    return cropBaseImage(parentBuffer.data, parentBuffer.info, product);
   });
-  const result = await Promise.allSettled(promises);
+  await sequential(promises);
 
   console.log(`Done - ${Date.now().valueOf() - start}ms`);
 };
 
 const runMe = async () => {
-  const parentBuffer = await sharp("./sample.jpeg").toBuffer();
+  const parentBuffer = await sharp("./sample.jpeg").rotate().raw().toBuffer({resolveWithObject: true});
 
   const promises = [];
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 1; i++) {
     promises.push(runTest(parentBuffer));
   }
 
