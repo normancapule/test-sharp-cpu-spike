@@ -1,7 +1,8 @@
 import sharp, { OutputInfo } from "sharp";
+import { Worker } from "node:worker_threads";
 import fs from "node:fs";
 
-type Product = {
+export type Product = {
   x1: number;
   x2: number;
   y1: number;
@@ -149,7 +150,7 @@ const sequential = async (promises: Promise<any>[]) => {
 
   return results;
 };
-const runTest = async (parentBuffer: { data: Buffer, info: OutputInfo}) => {
+const runTest = async (parentBuffer: { data: Buffer; info: OutputInfo }) => {
   const start = Date.now().valueOf();
   const promises = products.map(async (product) => {
     return cropBaseImage(parentBuffer.data, parentBuffer.info, product);
@@ -159,15 +160,34 @@ const runTest = async (parentBuffer: { data: Buffer, info: OutputInfo}) => {
   console.log(`Done - ${Date.now().valueOf() - start}ms`);
 };
 
+const runWorkerTest = async (parentBuffer: { data: Buffer; info: OutputInfo }) => {
+  const start = Date.now().valueOf();
+  const response = await new Promise((resolve, reject) => {
+    const worker = new Worker("./worker.js", {
+      workerData: { products, parentBuffer },
+    });
+    worker.on("message", resolve);
+    worker.on("error", reject);
+  });
+  console.log(`Done - ${Date.now().valueOf() - start}ms`);
+  console.log((response as unknown[]).length);
+}
+
 const runMe = async () => {
-  const parentBuffer = await sharp("./sample.jpeg").rotate().raw().toBuffer({resolveWithObject: true});
+  const parentBuffer = await sharp("./sample.jpeg")
+    .rotate()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
 
-  const promises = [];
-  for (let i = 0; i < 1; i++) {
-    promises.push(runTest(parentBuffer));
-  }
+  // const promises = [];
+  // for (let i = 0; i < 1; i++) {
+  //   promises.push(runTest(parentBuffer));
+  // }
 
-  return Promise.allSettled(promises);
+  // return Promise.allSettled(promises);
+
+  await runWorkerTest(parentBuffer)
+
 };
 
 (async () => {
